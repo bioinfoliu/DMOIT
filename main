@@ -1,0 +1,311 @@
+###
+
+## -*- coding: utf-8 -*-
+
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader,Subset
+from sklearn.metrics import accuracy_score, roc_auc_score, f1_score
+from sklearn.model_selection import KFold
+import itertools
+import time 
+
+##################################################define functions###########################################
+#omics mRNA
+class TransformerEncoder1(nn.Module):
+    def __init__(self, embed_dim, dense_dim, num_heads, dropout_rate):
+        super(TransformerEncoder1, self).__init__()
+
+        self.mha = nn.MultiheadAttention(embed_dim, num_heads)
+        self.layernorm1 = nn.LayerNorm(embed_dim)
+        self.dropout1 = nn.Dropout(dropout_rate)
+
+        self.dense1 = nn.Linear(embed_dim, dense_dim)
+        self.dense2 = nn.Linear(dense_dim, embed_dim)
+        self.layernorm2 = nn.LayerNorm(embed_dim)
+        self.dropout2 = nn.Dropout(dropout_rate)
+
+    def forward(self, inputs):
+        attn_output, _ = self.mha(inputs, inputs, inputs)
+        attn_output = self.dropout1(attn_output)
+        out1 = self.layernorm1(inputs + attn_output)
+
+        dense_output = self.dense1(out1)
+        dense_output = self.dense2(dense_output)
+        dense_output = self.dropout2(dense_output)
+        out2 = self.layernorm2(out1 + dense_output)
+
+        return out2
+    
+#omics MET
+class TransformerEncoder2(nn.Module):
+    def __init__(self, embed_dim, dense_dim, num_heads, dropout_rate):
+        super(TransformerEncoder2, self).__init__()
+
+        self.mha = nn.MultiheadAttention(embed_dim, num_heads)
+        self.layernorm1 = nn.LayerNorm(embed_dim)
+        self.dropout1 = nn.Dropout(dropout_rate)
+
+        self.dense1 = nn.Linear(embed_dim, dense_dim)
+        self.dense2 = nn.Linear(dense_dim, embed_dim)
+        self.layernorm2 = nn.LayerNorm(embed_dim)
+        self.dropout2 = nn.Dropout(dropout_rate)
+
+    def forward(self, inputs):
+        attn_output, _ = self.mha(inputs, inputs, inputs)
+        attn_output = self.dropout1(attn_output)
+        out1 = self.layernorm1(inputs + attn_output)
+
+        dense_output = self.dense1(out1)
+        dense_output = self.dense2(dense_output)
+        dense_output = self.dropout2(dense_output)
+        out2 = self.layernorm2(out1 + dense_output)
+
+        return out2
+    
+
+#omics CNV
+class TransformerEncoder3(nn.Module):
+    def __init__(self, embed_dim, dense_dim, num_heads, dropout_rate):
+        super(TransformerEncoder3, self).__init__()
+
+        self.mha = nn.MultiheadAttention(embed_dim, num_heads)
+        self.layernorm1 = nn.LayerNorm(embed_dim)
+        self.dropout1 = nn.Dropout(dropout_rate)
+
+        self.dense1 = nn.Linear(embed_dim, dense_dim)
+        self.dense2 = nn.Linear(dense_dim, embed_dim)
+        self.layernorm2 = nn.LayerNorm(embed_dim)
+        self.dropout2 = nn.Dropout(dropout_rate)
+
+    def forward(self, inputs):
+        attn_output, _ = self.mha(inputs, inputs, inputs)
+        attn_output = self.dropout1(attn_output)
+        out1 = self.layernorm1(inputs + attn_output)
+
+        dense_output = self.dense1(out1)
+        dense_output = self.dense2(dense_output)
+        dense_output = self.dropout2(dense_output)
+        out2 = self.layernorm2(out1 + dense_output)
+
+        return out2
+
+
+#encode4 处理直接三个组学拼接
+class TransformerEncoder4(nn.Module):
+    def __init__(self, embed_dim, dense_dim, num_heads, dropout_rate):
+        super(TransformerEncoder4, self).__init__()
+
+        self.mha = nn.MultiheadAttention(embed_dim, num_heads)
+        self.layernorm1 = nn.LayerNorm(embed_dim)
+        self.dropout1 = nn.Dropout(dropout_rate)
+
+        self.dense1 = nn.Linear(embed_dim, dense_dim)
+        self.dense2 = nn.Linear(dense_dim, embed_dim)
+        self.layernorm2 = nn.LayerNorm(embed_dim)
+        self.dropout2 = nn.Dropout(dropout_rate)
+
+    def forward(self, inputs):
+        attn_output, _ = self.mha(inputs, inputs, inputs)
+        attn_output = self.dropout1(attn_output)
+        out1 = self.layernorm1(inputs + attn_output)
+
+        dense_output = self.dense1(out1)
+        dense_output = self.dense2(dense_output)
+        dense_output = self.dropout2(dense_output)
+        out2 = self.layernorm2(out1 + dense_output)
+
+        return out2
+
+
+class Transformer(nn.Module):
+    def __init__(self,embed_dim, dense_dim, num_heads, dropout_rate, num_blocks, output_sequence_length):
+        super(Transformer, self).__init__()
+
+        self.embedding1 = nn.Linear(matrix1.shape[1], embed_dim)    #omics1
+        self.embedding2 = nn.Linear(matrix2.shape[1], embed_dim)    #omics2
+        self.embedding3 = nn.Linear(matrix3.shape[1], embed_dim)     #omics3
+        self.embedding4 = nn.Linear(data_X.shape[1], embed_dim)    #omics 1+2+3
+
+        self.transformer_encoder1 = nn.ModuleList([TransformerEncoder1(embed_dim, dense_dim, num_heads, dropout_rate) for _ in range(num_blocks)])
+        self.transformer_encoder2 = nn.ModuleList([TransformerEncoder2(embed_dim, dense_dim, num_heads, dropout_rate) for _ in range(num_blocks)])
+        self.transformer_encoder3 = nn.ModuleList([TransformerEncoder3(embed_dim, dense_dim, num_heads, dropout_rate) for _ in range(num_blocks)])
+        self.transformer_encoder4 = nn.ModuleList([TransformerEncoder4(embed_dim, dense_dim, num_heads, dropout_rate) for _ in range(num_blocks)])
+
+        #self.position=LearnedPositionEncoding(embed_dim*4)   #三个组学拼接后位置编码
+       
+        self.layernorm1 = nn.LayerNorm(embed_dim*4)
+        self.dropout1 = nn.Dropout(dropout_rate)
+        self.mha1 = nn.MultiheadAttention(embed_dim*4, num_heads)
+        self.final_layer = nn.Linear(embed_dim*4 , output_sequence_length)
+
+    def forward(self, inputs):
+        encoder_inputs = inputs
+        
+        encoder_outputs1 = self.embedding1(encoder_inputs[:,:matrix1.shape[1]])   
+        for i in range(len(self.transformer_encoder1)):
+            encoder_outputs1 = self.transformer_encoder1[i](encoder_outputs1)   #Omics1 输入到 encoder1
+        num=matrix1.shape[1]+matrix2.shape[1]
+        encoder_outputs2 = self.embedding2(encoder_inputs[:,matrix1.shape[1]:num])
+        for i in range(len(self.transformer_encoder2)):
+            encoder_outputs2 = self.transformer_encoder2[i](encoder_outputs2)   #Omics2输入到 encoder2
+
+        encoder_outputs3 = self.embedding3(encoder_inputs[:,num:])  
+        for i in range(len(self.transformer_encoder3)):
+            encoder_outputs3 = self.transformer_encoder3[i](encoder_outputs3)   #Omics3输入到 encoder3
+
+        encoder_outputs4 = self.embedding4(encoder_inputs)
+        for i in range(len(self.transformer_encoder4)):                       #omics拼接后输入encoder4
+            encoder_outputs4 = self.transformer_encoder4[i](encoder_outputs4) 
+
+        encoder_outputs=torch.cat([encoder_outputs1, encoder_outputs2,encoder_outputs3,encoder_outputs4],1)     
+        
+        decoder_outputs = self.final_layer(encoder_outputs)
+        decoder_outputs = decoder_outputs.view(-1, T)
+        return decoder_outputs
+
+class MyDataset(Dataset):
+    def __init__(self, data_X, data_Y):
+        self.data_X = data_X
+        self.data_Y = data_Y
+
+    def __getitem__(self, index):
+        x = self.data_X[index]
+        y = self.data_Y[index]
+        return x, y
+
+    def __len__(self):
+        return len(self.data_X)
+    
+# Function to set seed for reproducibility
+def set_seed(seed):
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+
+#################################grid search tuning hyperparameters and 5 fold-changes ######################################################
+
+start_time = time.time()
+T=2
+epochs = 50
+param_grid = {
+    'embed_dim': [64, 128],
+    'dense_dim': [64,128],
+    'num_heads': [2, 4, 8],   #, 8
+    'dropout_rate': [0.01, 0.1],
+    'num_blocks': [1, 2],
+    'learn_rate': [0.001],
+    'batch_size': [32, 64]
+}
+
+# Generate all combinations of parameters
+param_combinations = list(itertools.product(
+    param_grid['embed_dim'],
+    param_grid['dense_dim'],
+    param_grid['num_heads'],
+    param_grid['dropout_rate'],
+    param_grid['num_blocks'],
+    param_grid['learn_rate'],
+    param_grid['batch_size']
+))
+
+# 参数初始化
+epochs = 50  # 根据需要调整
+results = []
+
+# 开始计时
+start_time = time.time()
+
+cancer_types = ["STAD", "LUSC", "LIHC", "HNSC", "BRCA"]
+types = ["mRNA", "MET", "CNV"]
+
+for c in cancer_types:
+    # 读取每种组学数据
+    matrices = {}
+    for t in types:
+        df = pd.read_csv(f'/Users/zliu/Desktop/1_bootstrap/data/{c}_bootstrap_{t}.csv')
+        df = df.dropna()
+        matrix = df.values
+        matrix = matrix[:, 1:]  # 假设第一列是索引列
+        matrices[t] = matrix
+
+    matrix1 = matrices["mRNA"]
+    matrix2 = matrices["MET"]
+    matrix3 = matrices["CNV"]
+
+    # 合并数据
+    data_X = np.hstack([matrix1, matrix2, matrix3])
+
+    # 读取标签
+    df_Y = pd.read_csv(f'/Users/zliu/Desktop/1_bootstrap/data/{c}_clinical_filtered.csv', index_col=0)
+    data_Y = df_Y["label"]
+    trainX = torch.Tensor(data_X.astype(float))
+    trainY = torch.Tensor(data_Y.astype(float))
+
+    # 初始化数据集
+    dataset = MyDataset(trainX, trainY)
+    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+    for params in param_combinations:
+        embed_dim, dense_dim, num_heads, dropout_rate, num_blocks, learn_rate, batch_size = params
+        print(f"Processing {c} with params: embed_dim={embed_dim}, dense_dim={dense_dim}, num_heads={num_heads}, dropout_rate={dropout_rate}, num_blocks={num_blocks}, learn_rate={learn_rate}, batch_size={batch_size}")
+
+        fold_results = []
+
+        for train_idx, val_idx in kf.split(dataset):
+            set_seed(42)
+
+            train_subset = Subset(dataset, train_idx)
+            val_subset = Subset(dataset, val_idx)
+
+            train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+            val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+
+            # 创建模型实例
+            model = Transformer(embed_dim=embed_dim, dense_dim=dense_dim, num_heads=num_heads, dropout_rate=dropout_rate, 
+                                num_blocks=num_blocks, output_sequence_length=len(data_Y.unique()))
+
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            model.to(device)
+
+            criterion = nn.CrossEntropyLoss()
+            optimizer = optim.Adam(model.parameters(), lr=learn_rate)
+
+            best_val_acc = 0
+            best_val_auc = 0
+            best_val_f1 = 0
+            best_epoch = 0
+
+            # 训练循环
+            for epoch in range(epochs):
+                model.train()
+                for inputs, labels in train_loader:
+                    inputs = inputs.to(device)
+                    labels = labels.to(device)
+
+                    optimizer.zero_grad()
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels.long())
+                    loss.backward()
+                    optimizer.step()
+
+                model.eval()
+                val_targets = []
+                val_predictions = []
+                with torch.no_grad():
+                    for inputs, labels in val_loader:
+                        inputs = inputs.to(device)
+                        labels = labels.to(device)
+                        outputs = model(inputs)
+                        _, predicted = torch.max(outputs.data, 1)
+
+                        val_targets.extend(labels.cpu().numpy())
+                        val_predictions.extend(predicted.cpu().numpy())
+
+                val_acc = accuracy_score(val_targets, val_predictions)
+                val_auc = roc_auc_score(val_targets, val_predictions, average='weighted', multi_class='ovr')
+                val_f1 = f1_score(val_targets, val_predictions, average='weighted')
